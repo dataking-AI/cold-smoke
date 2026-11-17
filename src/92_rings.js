@@ -1,23 +1,28 @@
 // ---------------------------------------------------------------- 光圈挑战（试玩版，?dev 下的 Variants「光圈挑战」，默认关）
-// The rings of the ring challenge. The nearest ring is a ring of glowing dust round a glowing tube (a band with body, not a line: grains in a
-// tube a little thicker than the core, wandering on the spot and blinking, a few drifting outward, a faint aurora curtain on it: green low,
-// violet high, like the game's aurora). The next three are only a flame each, fainter the farther they are, so the line ahead can be read. As
+// The rings of the ring challenge. The nearest ring is a dense swarm of glowing grains (thickest along its middle line, each grain jittering
+// fast on its spot and running along the ring, short-lived, a few drifting outward: green low, violet high, like the game's aurora; 用户
+// 05:22 UTC: 由点组成，不要实心的管子). The next three are only a flame each, fainter the farther they are, so the line ahead can be read. As
 // the skier closes on the ring in front, the next flame swells in place and opens into a ring; the ring passed scatters.
 // They are things in the world, drawn in the scene pass with the scene's depth (用户 04:58 UTC: 必须是 physical 的东西，人在前面要挡住，要有
-// 体积，要有影子): the skier, the trees and the hill hide them pixel by pixel, the ring's tube casts its shadow into the sun's shadow map, and
+// 体积，要有影子): the skier, the trees and the hill hide them pixel by pixel, each grain casts its shadow into the sun's shadow map (a dappled band
+// that moves with them), and
 // its light falls on the snow round it (and on the skier riding through). A flame's glow is a wide sheet of lit air at the flame's own depth,
 // so what stands in front of the flame cuts it, and over a ridge the glow above the ridge line is still seen.
-// Rings are thrown at random ahead of the skier while the mode is on: on the run, inside the piste, away from trees and rocks, of different
-// sizes; after a flagged kicker a ring hangs in the air of the jump.
+// Rings are laid ahead of the skier while the mode is on, station by station of the designed run (PLAN below), in three sizes set by
+// 光圈难度; after a flagged kicker a ring hangs in the air of the jump.
 const Rings = (() => {
   const RG = { on: false, rings: [], passed: 0, missed: 0, hud: null, n: 0, pipes: [] };
   if (typeof Variants !== 'undefined') Variants.def('rings', '光圈挑战', [['off', '关'], ['on', '开']], 'off');
+  // (developer mode only for now, as the other trial switches: without ?dev it is off, whatever an address or an earlier pick says)
+  const devOn = () => { try { return !(self.COLD_SMOKE && self.COLD_SMOKE.noDev) && (/[?&]dev(=|&|$)/.test(location.search) || /\/dev\/?$/.test(location.pathname) || !!(self.COLD_SMOKE && self.COLD_SMOKE.dev)); } catch (e) { return false; } };
   const cl = (v, a, b) => Math.max(a, Math.min(b, v));
   const ease = x => 1 - Math.pow(1 - cl(x, 0, 1), 3);
-  const SIZES = [2.2, 3, 3.5, 4.5, 5.5];
+  // (用户 05:28 UTC: 现在的圈太大，随机混 3、4 种：现在的 2/3、1/2、1/3，钻着试): radii as shares of the 4.5 m ring he saw; the HUD names
+  // the share of the ring in front so he can say which one is right
+  // UPDATE (用户 05:43 UTC): keep three, 2/3, 1/2, 1/3, set by how hard the stretch is (index 0 easy .. 2 hard)
+  const SIZES = [[3.0, '2/3'], [2.25, '1/2'], [1.5, '1/3']];
   const AHEAD = 4;                 // the ring in front + three flames
-  const GAP = [38, 62];            // metres between rings
-  const NA = 128, NT = 10, TORUS_N = NA * NT * 6, TONGUES = 56;
+  const TONGUES = 56;
   let gfx = null, pDust = null, pDustSh = null, pFlame = null, pLight = null;
   let lastS = null, rnd = 1, lastT = 0, serial = 0, drawList = [];
   const pc = {}, tn = {}, rk = {};
@@ -27,21 +32,76 @@ const Rings = (() => {
   function lipOf(f) { const xk = s => Course.at(s, pc).cx + f.u, hgt = s => Course.height(xk(s), -s, 0.5); let sc = f.s + f.len, best = 1e9; for (let s = f.s + 2; s <= f.s + f.len + 6; s += 0.5) { const c = hgt(s + 0.5) + hgt(s - 0.5) - 2 * hgt(s); if (c < best) { best = c; sc = s; } } return { s: sc, y: hgt(sc), x: xk(sc) }; }
   function kickerIn(s0, s1) { for (let b = Math.floor((s0 - 40) / 32); b <= Math.floor(s1 / 32); b++) for (const f of Course.feats.get(b) || []) if (f.mark && f.s + f.len > s0 && f.s < s1) return f; return null; }
   function clear(s, u, hw) { for (const d of [0, -2.5, 2.5, -5, 5, -7.5, 7.5]) { const uu = cl(u + d, -hw + 4, hw - 4), x = Course.at(s, pc).cx + uu; let ok = true; for (const dz of [-6, 0, 6]) { Course.nearTree(x, -s + dz, tn); if (tn.ok && !tn.soft && tn.d < 5.5) ok = false; } if (Course.rockHit && Course.rockHit(x, -s, rk)) ok = false; if (ok) return uu; } return null; }
-  function spawn() {
-    const last = RG.rings[RG.rings.length - 1], s0 = last ? last.s : -Game.s.p[2] + 25, u0 = last ? last.u : Game.s.p[0] - Course.at(-Game.s.p[2], pc).cx;
-    let s = s0 + GAP[0] + (GAP[1] - GAP[0]) * rand();
-    const f = kickerIn(s0 + 10, s + 20);
-    if (f) { const lip = lipOf(f), sr = lip.s + 8, c = Course.at(sr, pc); RG.rings.push({ id: serial++, s: sr, u: f.u, x: c.cx + f.u, y: lip.y - 0.7, r: 3, air: true, born: lastT, grow: -1, pass: -1, hit: 0, splash: -1 }); return; }
-    const c = Course.at(s, pc), hw = c.hw || 14;
-    let u = cl(u0 + (rand() < 0.5 ? -1 : 1) * (4 + 7 * rand()), -hw * 0.55, hw * 0.55);
-    const uu = clear(s, u, hw); if (uu === null) { RG.rings.push({ id: serial++, s, skip: true }); return; }
-    // a whole ring, always (用户 04:47 UTC: 不要一会儿半个): it stands clear of the snow under all of it, its foot a hand above the highest point
-    // (用户 05:16 UTC: 圈再靠下一点，要从里面开过去、腿要在圈里): the ring's foot is set into the snow a hand deep where the skier rides through
-    // it, so the skis go through the ring, not under it. Only the lowest stretch of the arc is under the snow; the sides stand clear of it
-    const r = SIZES[Math.floor(rand() * SIZES.length)], x = c.cx + uu; let top = -1e9; for (let i = -3; i <= 3; i++) top = Math.max(top, Course.height(x + r * 0.35 * i / 3, -s, 0.5));
-    RG.rings.push({ id: serial++, s, u: uu, x, y: top + r - 0.12, r, air: false, born: lastT, grow: -1, pass: -1, hit: 0, splash: -1 });
+  // ---- how the rings are laid out (用户 05:43 UTC: 三档大小按难度定，再想想圈怎么排布). Each station of the designed run (Course.ROUTE,
+  // 经典编排) has its own way: lv how hard it is (0 big rings, 2 small), gap metres between rings, how they stand across the run:
+  //   weave  side to side, a slalom feel (open slopes)
+  //   apex   on the inside of each bend of a winding lane, where the line through the bend runs; round the bend it is hidden by the trees
+  //          until you are in it (藏), then there
+  //   centre in the middle of the run where it opens to the city: the ring frames the view (露, 借景)
+  //   crest  just over the top of a roller: hidden behind the crest, seen as you top it
+  //   wall   up on one wall of the U gully, then the other: ride the walls
+  //   none   no ground rings (the jumps: the ring is in the air past each kicker)
+  // 光圈难度 moves every station a step: 轻松 bigger rings, gentler side steps, more room; 难 smaller, wider steps, closer together
+  const PLAN = {
+    bowl: { lv: 0, gap: [45, 60], how: 'weave', side: 7 },
+    corridor: { lv: 1, gap: [55, 75], how: 'apex' },
+    steeps: { lv: 1, gap: [50, 65], how: 'weave', side: 6 },
+    glade: { lv: 1, gap: [38, 52], how: 'weave', side: 6 },
+    kickers: { lv: 0, gap: [60, 80], how: 'none' },
+    gully: { lv: 1, gap: [40, 55], how: 'wall' },
+    ridge: { lv: 0, gap: [60, 80], how: 'centre' },
+    moguls: { lv: 1, gap: [35, 45], how: 'weave', side: 4 },
+    powder: { lv: 0, gap: [50, 70], how: 'weave', side: 9 },
+    rollers: { lv: 1, gap: [45, 60], how: 'crest' },
+  };
+  if (typeof Variants !== 'undefined') Variants.def('ringdiff', '光圈难度', [['a', '轻松'], ['b', '标准'], ['c', '难']], 'b');
+  const DIFF = { a: { off: -1, side: 0.6, gap: 1.15 }, b: { off: 0, side: 1, gap: 1 }, c: { off: 1, side: 1.35, gap: 0.85 } };
+  function station(s) {
+    Course.at(s, pc);
+    const segs = Course.segs || []; let sg = null; for (const g of segs) { if (g.s0 <= s) sg = g; else break; }
+    const st = sg && Course.ROUTE && Course.route !== false && sg.idx < Course.ROUTE.length ? Course.ROUTE[sg.idx] : null;
+    let pl = PLAN[sg ? sg.type : 'bowl'] || PLAN.bowl;
+    if (st && st.aim) pl = Object.assign({}, pl, s - sg.s0 < 110 ? { how: 'centre', lv: 0 } : { how: 'weave', side: 7, lv: 0 });          // (the run swings round to face the city: the first rings frame it, then a wide weave)
+    if (sg && sg.type === 'steeps' && st && st.enc) pl = Object.assign({}, pl, { how: 'apex', lv: 2 });          // (the last steep lane in the trees)
+    if (sg && sg.type === 'corridor' && sg.idx > 2) pl = Object.assign({}, pl, { lv: 2 });          // (the second lane: tighter bends, smaller rings)
+    return { pl, sg, st };
   }
-  function reset() { RG.rings.length = 0; RG.passed = RG.missed = 0; rnd = 1 + Math.floor((Date.now() % 100000)); lastS = null; drawList = []; }
+  const bend = s => { const a = Course.at(s - 15, pc).cx, b = Course.at(s + 15, pc).cx, c = Course.at(s, pc).cx; return a + b - 2 * c; };
+  const hump = s => { const cx = t => Course.at(t, pc).cx, h = t => Course.height(cx(t), -t, 0.5); return h(s - 8) + h(s + 8) - 2 * h(s); };
+  let wallSide = 1, cursor = null;
+  function spawn() {
+    // (where the last ring, or the last place passed over without one, stood: a stretch with no ground rings is still walked through)
+    if (!cursor) cursor = { s: -Game.s.p[2] + 25, u: Game.s.p[0] - Course.at(-Game.s.p[2], pc).cx };
+    const s0 = cursor.s, u0 = cursor.u;
+    const D = DIFF[(typeof Variants !== 'undefined' && Variants.val.ringdiff) || 'b'] || DIFF.b;
+    const { pl } = station(s0 + 40);
+    let s = s0 + (pl.gap[0] + (pl.gap[1] - pl.gap[0]) * rand()) * D.gap;
+    const f = kickerIn(s0 + 10, s + 20);
+    const lvAir = cl(D.off, 0, 2);
+    if (f) { const lip = lipOf(f), sr = lip.s + 8, c = Course.at(sr, pc), z = SIZES[lvAir]; RG.rings.push({ id: serial++, s: sr, u: f.u, x: c.cx + f.u, y: lip.y - 0.7, r: z[0], tag: z[1], air: true, born: lastT, grow: -1, pass: -1, hit: 0, splash: -1 }); cursor = { s: sr, u: f.u }; return; }
+    if (pl.how === 'none') { cursor = { s, u: u0 }; RG.rings.push({ id: serial++, s, skip: true }); return; }
+    const c0 = Course.at(s, pc), hw = c0.hw || 14;
+    let u;
+    if (pl.how === 'apex') {
+      // the bend's apex within the next stretch: where the run curves most; the ring on its inside
+      let best = s, bk = 0; for (let t = s - 15; t <= s + 25; t += 5) { const k = bend(t); if (Math.abs(k) > Math.abs(bk)) { bk = k; best = t; } }
+      if (Math.abs(bk) > 0.15) { s = best; u = Math.sign(bk) * hw * (D.off > 0 ? 0.45 : 0.3); } else u = u0 + (rand() < 0.5 ? -1 : 1) * 4 * D.side;
+    } else if (pl.how === 'crest') {
+      let best = s, bk = 0; for (let t = s - 15; t <= s + 20; t += 2.5) { const k = hump(t); if (k < bk) { bk = k; best = t; } }
+      s = best + 5; u = u0 + (Math.abs(u0) > 2 ? -Math.sign(u0) : (rand() < 0.5 ? -1 : 1)) * (4 + 5 * rand()) * D.side;
+    } else if (pl.how === 'wall') { wallSide = -wallSide; u = wallSide * hw * (0.45 + 0.15 * cl(D.off + 1, 0, 2) / 2); }
+    else if (pl.how === 'centre') u = (rand() - 0.5) * 3;
+    else { const dir = Math.abs(u0) > 2 ? -Math.sign(u0) : (rand() < 0.5 ? -1 : 1); u = u0 + dir * (0.6 + 0.6 * rand()) * pl.side * 1.6 * D.side; }          // (side to side, a slalom: always back across the run)
+    const c = Course.at(s, pc), hw2 = c.hw || 14;
+    u = cl(u, -hw2 * 0.6, hw2 * 0.6);
+    const uu = clear(s, u, hw2); if (uu === null) { cursor = { s, u: u0 }; RG.rings.push({ id: serial++, s, skip: true }); return; }
+    // (用户 04:47 UTC 一整个圈; 05:16 UTC 圈靠下、腿从圈里过): its foot a hand into the snow under the middle of it, the sides clear
+    const lv = cl(Math.round(pl.lv + D.off + (rand() - 0.5) * 1.3), 0, 2), pick = SIZES[lv], r = pick[0], x = c.cx + uu;
+    let top = -1e9; for (let i = -3; i <= 3; i++) top = Math.max(top, Course.height(x + r * 0.35 * i / 3, -s, 0.5));
+    cursor = { s, u: uu };
+    RG.rings.push({ id: serial++, s, u: uu, x, y: top + r - 0.12, r, tag: pick[1], air: false, born: lastT, grow: -1, pass: -1, hit: 0, splash: -1 });
+  }
+  function reset() { RG.rings.length = 0; RG.passed = RG.missed = 0; rnd = 1 + Math.floor((Date.now() % 100000)); lastS = null; drawList = []; cursor = null; }
 
   // ---- each frame, before the game draws
   function update(T) {
@@ -90,7 +150,7 @@ const Rings = (() => {
   function hud() {
     if (!RG.hud) { RG.hud = document.createElement('div'); RG.hud.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);font:500 13px/1 system-ui,sans-serif;letter-spacing:.12em;color:rgba(255,255,255,.85);text-shadow:0 1px 3px rgba(0,0,0,.45);pointer-events:none;z-index:3'; document.body.appendChild(RG.hud); }
     RG.hud.style.display = RG.on ? '' : 'none';
-    const t = '光圈 ' + RG.passed + ' / ' + (RG.passed + RG.missed); if (RG.hud.textContent !== t) RG.hud.textContent = t;
+    const cur = RG.rings.find(r => r.pass < 0 && !r.skip), dn = { a: '轻松', b: '标准', c: '难' }[(typeof Variants !== 'undefined' && Variants.val.ringdiff) || 'b'] || '标准', t = '光圈（' + dn + '） ' + RG.passed + ' / ' + (RG.passed + RG.missed) + (cur && cur.tag ? '　·　这个圈 ' + cur.tag + ' 大' : ''); if (RG.hud.textContent !== t) RG.hud.textContent = t;
   }
 
   // ---- the GPU side
@@ -147,7 +207,7 @@ const Rings = (() => {
   };
 
   RG.frame = function () {
-    const want = typeof Variants !== 'undefined' && Variants.val.rings === 'on';
+    const want = typeof Variants !== 'undefined' && Variants.val.rings === 'on' && devOn();
     if (want !== RG.on) { RG.on = want; reset(); hud(); }
     // (用户 05:16 UTC: 拍照时光圈不见了): held (the pause menu, 拍照) the world stands still, and so do the rings: drawn as they were, time stopped
     if (RG.on && typeof Game !== 'undefined' && Game.mode === 'hold') return;
@@ -169,26 +229,7 @@ const Rings = (() => {
 })();
 
 // ---- shaders. Colours are linear; light is in units of film white (ringE: one over the exposure, so 1 is white on the screen at any hour)
-// the ring's tube: NA segments round, NT round the tube, a triangle list. Its radius breathes with the same wave that runs round the curtain
-const RING_SSL_GEO = `
-struct RT { pos: vec3f, nrm: vec3f, ang: f32 }
-fn ringTube() -> f32 { return 0.16 * M.c.w * (0.4 + 0.6 * M.b.x); }
-fn ringTorus(vid: u32, R: f32, rc: f32, T: f32, wob: f32) -> RT {
-  var o: RT;
-  let qd: u32 = vid / 6u; let k: u32 = vid % 6u;
-  let i: u32 = qd / 10u; let j: u32 = qd % 10u;
-  let di: f32 = select(0.0, 1.0, k == 1u || k == 4u || k == 5u);
-  let dj: f32 = select(0.0, 1.0, k == 2u || k == 3u || k == 5u);
-  let a: f32 = (f32(i) + di) / 128.0 * 6.2831853;
-  let b: f32 = (f32(j) + dj) / 10.0 * 6.2831853;
-  let rr: f32 = rc * (1.0 + 0.18 * sin(a * 5.0 - T * 1.6 + sin(a * 3.0 + T * 0.7)));
-  let Rw: f32 = R + wob * sin(a * 7.0 + T * 0.9);
-  let n: vec3f = vec3f(cos(a) * cos(b), sin(a) * cos(b), sin(b));
-  o.pos = vec3f(cos(a) * Rw, sin(a) * Rw, 0.0) + n * rr; o.nrm = n; o.ang = a;
-  return o;
-}
-`;
-const RING_SSL = RING_SSL_GEO + `
+const RING_SSL = `
 fn ringE() -> f32 { return 1.0 / max(U.ambSky.w, 1e-4); }
 fn ringGrn(n: f32) -> vec3f { return mix(vec3f(0.033, 0.896, 0.392), vec3f(0.021, 1.0, 0.262), n); }
 fn ringVio(n: f32) -> vec3f { return mix(vec3f(0.305, 0.188, 0.791), vec3f(0.402, 0.045, 0.716), n); }
@@ -216,7 +257,7 @@ fn ringQuad(corner: vec2f, p0: vec3f, p1: vec3f, rw: f32, minPx: f32) -> RQ {
   return q;
 }
 `;
-// the grains: kind 0 the dense tube of dust round the core, kind 1 the outer grains drifting off and turning violet, kind 2 the curtain's threads.
+// the grains: kind 0 the dense swarm along the ring, kind 1 the outer grains drifting off and turning violet, kind 2 the curtain's threads (none drawn now).
 // Each is a pure function of (index, time): a life of a few seconds, then it is born again somewhere else on the ring
 // one grain of a ring, a pure function of (index, time): where it is, how bright, how big
 const DUST_SSL = `

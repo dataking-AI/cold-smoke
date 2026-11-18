@@ -17,7 +17,7 @@ const UI = (() => {
       bar: $('bar'), mn: $('mn'), menu: $('menu'), nav: $('menu').querySelector('nav'), pane: $('mpane'), mk: $('m-k'), mGo: $('m-go'), mTop: $('m-top'), oSnd: $('o-snd'), oFs: $('o-fs'), oLang: $('o-lang'), oQ: $('o-q'),
       time: $('sw-time'), kinds: $('sw-seg'), ev: $('sw-ev'), view: $('sw-view'), seed: $('sw-seed'), skied: $('sw-skied'), more: $('more'), drop2: $('drop2'), vw: $('vw'),
       say: $('say'), sayK: $('say-k'), sayV: $('say-v'), cut: $('cut'), jump: $('jump'), tuck: $('tuck'),
-      pause: $('pause'), pauseS: $('pause-s'), pauseT: $('pause-t'), steer: $('steer'), steerV: $('steer-v'),
+      pause: $('pause'), pauseS: $('pause-s'), pauseT: $('pause-t'), steer: $('steer'), steerV: $('steer-v'), rec: $('rec'),
       clk: $('clock'), clkT: $('clk-t'), clkS: $('clk-s'), clkG: $('clk-g') };
     // developer mode (?dev, or a path ending in /dev; never in the 小红书 build). The time, the weather, the encounters and the versions
     // are only there. Taken out of the tree, not merely hidden, so a normal player cannot reach them.
@@ -58,6 +58,7 @@ const UI = (() => {
     function muteKey(c) { try { if (typeof Input !== 'undefined' && Input.keys) { Input.mute = c; Input.keys[c] = false; } } catch (err) { } }
     el.snd.addEventListener('click', e => { e.stopPropagation(); U.sound(!Sound.on); if (e.detail) el.snd.blur(); });
     el.fs.addEventListener('click', e => { e.stopPropagation(); U.fullscreen(); });
+    if (el.rec) el.rec.addEventListener('click', e => { e.stopPropagation(); U.recordToggle(); if (e.detail) el.rec.blur(); });
     /*web{*/ document.addEventListener('fullscreenchange', () => {
       const on = !!document.fullscreenElement, own = performance.now() - fsT < 1500; fsT = performance.now();
       el.fs.classList.toggle('full', on); el.fs.setAttribute('aria-pressed', on ? 'true' : 'false'); U.layout(); if (U.open) paint();
@@ -122,6 +123,22 @@ const UI = (() => {
     el.bar.classList.add('on'); paint(); sayMountain();
   };
   U.sound = function (on) { Sound.setOn(on); el.snd.classList.toggle('mute', !on); el.snd.setAttribute('aria-pressed', on ? 'true' : 'false'); if (U.open) paint(); };
+  U.recordToggle = function () {
+    if (!el || !el.rec || typeof SkiExport === 'undefined') return;
+    if (SkiExport.active) {
+      const result = SkiExport.stop(), status = SkiExport.status();
+      el.rec.classList.remove('recording'); el.rec.setAttribute('aria-pressed', 'false'); el.rec.title = 'Start recording';
+      if (status.samples < 2) { say('Recording', 'No samples'); return; }
+      const stamp = new Date().toISOString().replace(/[.:]/g, '-');
+      SkiExport.download('cold-smoke-' + stamp + '.json');
+      say('Recording', status.samples + ' samples downloaded');
+      return result;
+    }
+    SkiExport.start({ sampleHz: 30 });
+    el.rec.classList.add('recording'); el.rec.setAttribute('aria-pressed', 'true'); el.rec.title = 'Stop and download recording';
+    say('Recording', 'Started at 30 Hz');
+    return SkiExport.status();
+  };
   U.keepAwake = function () { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(w => { wake = w; }, () => { }); } catch (e) { } };
   // the whole screen, where the browser allows it. On a phone that also lets us ask for the picture to be laid wide for real
   // (/*web{*/ … /*}web*/ is left out of the 小红书 小工具 build: the container manages the screen and forbids asking for it, tools/build-xhs.js)

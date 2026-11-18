@@ -55,7 +55,7 @@ async function boot(stage) {
   Render.passes.fx.push(R => Spray.fx(R));
   Render.passes.fx.push(R => Grains.fx(R));                             // (the crystals and clumps in the thrown snow, over its cloud)
   Render.passes.fx.push(R => Dust.fx(R));
-  Game.onStep = (S, H) => Spray.onStep(S, H, App.t - (Game.t - Game.stepT));
+  Game.onStep = (S, H) => { Spray.onStep(S, H, App.t - (Game.t - Game.stepT)); if (typeof SkiExport !== 'undefined') SkiExport.physicsStep(S, H); };
   Render.passes.shadow.push(() => { if (App.skierRoot) Skier.drawShadow(); Deer.drawShadow(); Trees.drawShadow(); });
   Render.passes.shadow.push(() => Gates.drawShadow());
   Render.passes.pre.push(R => Spray.pre(R)); Render.passes.pre.push(() => Tracks.pre());
@@ -92,6 +92,7 @@ function tick(dt, draw) {
   Render.updateOrigin(cp);
   if (draw !== false) Terrain.update(cp[0], cp[2]);
   Skier.update(Game.root, Game.pose, Render.origin);
+  if (typeof SkiExport !== 'undefined') SkiExport.frame(dt);
   Trees.update(Render.cam, Render.origin, Render.W / Render.H, Game.root.pos, dt);
   Gates.update(Render.cam, Render.origin, Game.root.pos, dt, App.t);
   Deer.update(dt, App.t);
@@ -336,7 +337,7 @@ window.__ski = {
   reset(s0) { Game.reset(s0); Game.mode = 'title'; },
   // set the time of day: minutes from midnight on the 24-minute day, or a name (day, golden, sunset, dusk, night, dawn, sunrise)
   tod(t) { Sky.setClock(typeof t === 'string' ? Sky.times[t] : t); Sky.update(); Clouds.baked = false; Vista.shadowElev = -9; Vista.updateShadow(true); return +Sky.sunElev.toFixed(4); },
-  game: () => Game, input: () => Input, app: () => App, ui: () => UI, i18n: () => I18N,
+  game: () => Game, input: () => Input, app: () => App, ui: () => UI, i18n: () => I18N, record: SkiExport,
   get m() { return { Sky, Render, Post, App, Terrain, Course, Spray, Game, Input, Skier, Tex, Dust, Nebula, Clouds, Trees, Shafts, Vista, Tracks, Sound, Atmo, Deer, View, Variants, Weather, Grains, Quality, SnowLook, XR, UI }; },
 };
 App.fit = fit;

@@ -48,7 +48,7 @@ const I18N = (() => {
     '空格 跳（按住蓄力） · ↓ 加速': 'Space to jump (hold to load up) · ↓ to tuck', '← →  或  A D  转弯': '← →  or  A D  to turn',
     '画面断开了': 'THE PICTURE WAS LOST', '点一下重新上山': 'Tap to ski again',
     // ---- the runs (Course: SEG_NAMES), the hours, the weather, the views, the animals
-    '开阔大坡': 'Open Bowl', '陡坡': 'The Steeps', '树林': 'Glade', '起伏': 'Rollers', '雪槽': 'Gully', '跳台': 'Kickers', '深粉雪': 'Deep Powder', '山脊': 'Ridge', '蘑菇': 'Moguls',
+    '开阔大坡': 'Open Bowl', '陡坡': 'The Steeps', '树林': 'Glade', '起伏': 'Rollers', '雪槽': 'Gully', '跳台': 'Kickers', '深粉雪': 'Deep Powder', '山脊': 'Ridge', '蘑菇': 'Moguls', '林道': 'Forest Lane',
     '自动': 'Auto', '白天': 'Day', '傍晚': 'Golden hour', '黄昏': 'Dusk', '夜晚': 'Night', '黎明': 'Dawn',
     '晴': 'Clear', '小雪': 'Light snow', '中雪': 'Snow', '大雪': 'Heavy snow', '雷暴雪': 'Thundersnow',
     '上午': 'Morning', '中午': 'Midday', '下午': 'Afternoon', '固定': 'Held',
@@ -98,14 +98,14 @@ const I18N = (() => {
     '声音 开': 'Sound on', '声音 关': 'Sound off', '画质 自动': 'Quality: auto', '画质 高': 'Quality: high', '画质 均衡': 'Quality: balanced', '画质 流畅': 'Quality: smooth', '语言': 'Language',
     '给验收用，不是游戏的一部分 · 小圆点是推荐的版本': 'For review, not part of the game · the dot marks the recommended version', '恢复推荐': 'Reset to recommended', '推荐': 'Recommended',
     // ---- the versions page (Variants: the rows' names and their versions, as each module registers them)
-    '镜头': 'Camera', '人物与动作': 'Skier & motion', '画面': 'Picture', '雪': 'Snow', '场景与天气': 'Scene & weather', '手感': 'Feel', '新加的': 'New',
+    '镜头': 'Camera', '人物与动作': 'Skier & motion', '人物动作（11 月 16 日评审）': 'Skier motion (16 Nov review)', '画面': 'Picture', '雪': 'Snow', '场景与天气': 'Scene & weather', '手感': 'Feel', '新加的': 'New',
     '追身镜头': 'Chase camera', '林间镜头': 'Camera in trees', '穿林': 'Through the trees', '树林闪烁': 'Woods flicker', '分段机位': 'Camera per run', '雪板尖机位': 'Ski-tips camera', '俯冲手位': 'Hands in a tuck', '四角模糊': 'Corner blur',
-    '雪面颤动': 'Snow chatter', '风压抖动': 'Wind buffet', '人物模型': 'Skier model', '衣服': 'Clothing', '持杖': 'Pole carry', '人物动作': 'Skier motion',
+    '雪面颤动': 'Snow chatter', '风压抖动': 'Wind buffet', '人物模型': 'Skier model', '衣服': 'Clothing', '持杖': 'Pole carry', '人物动作': 'Skier motion', '动作·时序': 'Motion · timing', '板刃时序': 'Edge timing', '动作·雪杖': 'Motion · poles', '动作·头和上身': 'Motion · head and trunk', '动作·起跳和落地': 'Motion · take-off and landing', '电脑上的蓄力圈': 'Jump charge ring (keyboard)', '不显示': 'Hidden', '显示': 'Shown',
     '逆光光斑': 'Lens ghosts', '高光': 'Highlights', '夜间雪雾': 'Spray at night', '夜空颜色': 'Night sky colour', '小云': 'Small clouds',
     '雪幕高度': 'Spray height', '闪光': 'Sparkle', '雪团': 'Snow clumps', '镜头上的雪': 'Snow on the lens', '粉雪深度': 'Powder depth', '风吹雪': 'Blowing snow',
     '岩壁': 'Rock walls', '夜里的月亮': 'Moon at night', '极光': 'Aurora', '和星云轮流': 'Takes turns with nebula', '随机': 'Random', '大雪样式': 'Heavy snow style', '山脊树': 'Ridge trees', '跳台旗': 'Jump flags', '入雪深浅': 'Ski sink', '风声': 'Wind sound',
     '键盘转弯': 'Keyboard turns',
-    '现在的': 'Current', '原来': 'Original', '原样': 'As was', '新的': 'New', '低机位': 'Low', '折中': 'Middle', '贴近': 'Closer', '原位淡树': 'Fade trees', '树会淡出': 'Trees fade out', '树留着': 'Trees stay', '原来（逐帧颗粒）': 'Original (grain every frame)', '稳定': 'Steady',
+    '现在的': 'Current', '修正': 'Corrected', '身体先走': 'Body first', '和身体同步': 'With the body', '原来': 'Original', '原样': 'As was', '新的': 'New', '低机位': 'Low', '折中': 'Middle', '贴近': 'Closer', '原位淡树': 'Fade trees', '树会淡出': 'Trees fade out', '树留着': 'Trees stay', '原来（逐帧颗粒）': 'Original (grain every frame)', '稳定': 'Steady',
     '不变': 'Fixed', '按路段大变': 'Big', '轻微变化': 'Subtle', '贴板': 'On the ski', '大腿': 'Thigh', '头盔': 'Helmet', '压低': 'Low', '面前': 'In front',
     '无': 'None', '轻': 'Light', '明显': 'Strong', '关': 'Off', '开': 'On', '有': 'On', '更强': 'Stronger', '没有': 'None', '真实': 'Realistic', '多一些': 'More', '再多一点': 'Even more',
     '没有冰晶群': 'No swarms', '水珠': 'Droplets', '白雪被吹走': 'Blown off', '先白后化': 'Melts', '平整': 'Smooth', '自然': 'Natural', '厚实': 'Thick',
@@ -115,6 +115,7 @@ const I18N = (() => {
     '宽旗': 'Wide flags', '羽毛旗': 'Feather flags', '浅': 'Shallow', '适中': 'Medium', '深': 'Deep', '大一点': 'Louder', '更大': 'Loudest',
     '按半秒就搓': 'Skid after ½ s', '按两秒才搓': 'Skid after 2 s', '横过来才搓': 'Side-on only',
     '滑行手感': 'Ski feel',
+    '换刃咬雪': 'Edge bite', '随雪况': 'By the snow', '两倍延迟': 'Twice the delay',
   };
   const KEY = 'coldsmoke.lang';
   const L = { EN, lang: 'zh', subs: [] };

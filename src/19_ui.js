@@ -3,7 +3,7 @@ const UI = (() => {
   const U = { state: 'load', segIdx: -1, hintT: 0, hintKind: null, acc: 0, shown: { spd: -1, drop: -1 }, tod: 'auto', open: false };
   const $ = id => document.getElementById(id);
   const T = s => I18N.t(s), EN = () => I18N.en();          // (the words shown: see 00a_i18n.js)
-  const SEG_EN = { bowl: 'OPEN BOWL', steeps: 'THE STEEPS', glade: 'GLADE', rollers: 'ROLLERS', gully: 'GULLY', kickers: 'KICKERS', powder: 'DEEP POWDER', ridge: 'RIDGE', moguls: 'MOGULS' };
+  const SEG_EN = { bowl: 'OPEN BOWL', steeps: 'THE STEEPS', glade: 'GLADE', rollers: 'ROLLERS', gully: 'GULLY', kickers: 'KICKERS', powder: 'DEEP POWDER', ridge: 'RIDGE', moguls: 'MOGULS', corridor: 'FOREST LANE' };
   // the hours the day can be turned to, in the order the sun goes through them (keys of Sky.times)
   const TIMES = [['day', '白天'], ['golden', '傍晚'], ['sunset', '日落'], ['dusk', '黄昏'], ['night', '夜晚'], ['dawn', '黎明']];
   const mq = q => !!(window.matchMedia && matchMedia(q).matches);
@@ -17,7 +17,7 @@ const UI = (() => {
       bar: $('bar'), mn: $('mn'), menu: $('menu'), nav: $('menu').querySelector('nav'), pane: $('mpane'), mk: $('m-k'), mGo: $('m-go'), mTop: $('m-top'), oSnd: $('o-snd'), oFs: $('o-fs'), oLang: $('o-lang'), oQ: $('o-q'),
       time: $('sw-time'), kinds: $('sw-seg'), ev: $('sw-ev'), view: $('sw-view'), seed: $('sw-seed'), skied: $('sw-skied'), more: $('more'), drop2: $('drop2'), vw: $('vw'),
       say: $('say'), sayK: $('say-k'), sayV: $('say-v'), cut: $('cut'), jump: $('jump'), tuck: $('tuck'),
-      pause: $('pause'), pauseS: $('pause-s'), pauseT: $('pause-t'), steer: $('steer'), steerV: $('steer-v'), rec: $('rec'),
+      pause: $('pause'), pauseS: $('pause-s'), pauseT: $('pause-t'), steer: $('steer'), steerV: $('steer-v'), chg: $('chg'), rec: $('rec'),
       clk: $('clock'), clkT: $('clk-t'), clkS: $('clk-s'), clkG: $('clk-g') };
     // developer mode (?dev, or a path ending in /dev; never in the 小红书 build). The time, the weather, the encounters and the versions
     // are only there. Taken out of the tree, not merely hidden, so a normal player cannot reach them.
@@ -162,6 +162,7 @@ const UI = (() => {
     // tilt has to be asked for from this tap (iOS shows its own prompt); where it is refused the finger takes over
     let asked = false; if (!XR.active) try { asked = await Promise.race([Input.requestTilt(), new Promise(r => setTimeout(() => r(false), 8000))]); } catch (e) { }
     Input.zeroPending = true; U.keepAwake();
+    if (App.later) await App.later;      // (the shaders held back at start-up: almost always done long before; see boot in 99_main.js)
     launch();
     U.state = 'run'; U.t0 = performance.now(); U.segIdx = -1; U.hintT = 0; U.hintKind = null; U.tiltAsked = asked;
     newRun();
@@ -579,12 +580,12 @@ const UI = (() => {
   // ---- the versions the owner picks between: their own page of the menu, not part of the game. One row for each choice in Variants, in
   // groups (a choice this list does not know yet goes under 新加的), the current version filled, the recommended one marked with a grain of
   // amber. A press switches at once (each module eases its own change); 恢复推荐 puts every choice back to the recommended version
-  const VGROUP = [['画面与音乐（11 月 16 日评审）', ['glint', 'gold', 'tbtn', 'nebday', 'nebnight', 'mlevel', 'tmusic', 'lsnow', 'plume', 'wbal', 'vary']], ['镜头', ['cam', 'wood', 'shots', 'tips', 'fptuck', 'edge', 'chatter', 'buffet']], ['人物与动作', ['body', 'cloth', 'poles', 'motion']],
+  const VGROUP = [['实验室人物（11 月 17 日）', ['rider', 'ride', 'rski', 'rboard', 'rtski', 'rtboard']], ['画面与音乐（11 月 16 日评审）', ['glint', 'gold', 'tbtn', 'nebday', 'nebnight', 'mlevel', 'tmusic', 'lsnow', 'plume', 'wbal', 'vary']], ['性能（11 月 17 日）', ['pslice', 'govjs', 'mbtap', 'patchd', 'bootq', 'tcull']], ['人物动作（11 月 16 日评审）', ['mo1', 'medge', 'mo2', 'mo3', 'mo4', 'kring']], ['镜头', ['cam', 'wood', 'shots', 'tips', 'fptuck', 'edge', 'chatter', 'buffet']], ['人物与动作', ['body', 'cloth', 'poles', 'motion']],
     ['画面', ['ghost', 'hi', 'nspray', 'nsky', 'cu']], ['雪', ['spray', 'curtain', 'sparkle', 'clumps', 'lens', 'pdepth', 'drift']], ['场景与天气', ['tpass', 'tgrain', 'tvar', 'rock', 'moon', 'aurora', 'snow', 'rtree', 'flag', 'sink', 'wind']], ['手感', ['keys']]];
   let vSig = null, wxSig = null;
   const varMod = () => { try { return typeof Variants !== 'undefined' && Variants && Array.isArray(Variants.defs) ? Variants : null; } catch (e) { return null; } };
   function initVariants() {
-    if (!VGROUP[VGROUP.length - 1][1].includes('feel')) VGROUP[VGROUP.length - 1][1].unshift('feel', 'fa');       // (滑行手感, 07_game.js, first under 手感)
+    if (!VGROUP[VGROUP.length - 1][1].includes('feel')) VGROUP[VGROUP.length - 1][1].unshift('feel', 'fa', 'ebite');       // (滑行手感 and the rest of 07_game.js's feel, first under 手感)
     el.vrows = $('sw-vrows'); el.vreset = $('sw-vreset'); el.wx = $('sw-wx'); el.wxc = $('sw-wxc');
     const V = varMod(); if (V && V.on) V.on(() => { if (U.open) paint(); });          // (a choice registered or changed elsewhere: shown at once)
     addEventListener('keydown', e => { if (!U.dev || e.code !== 'KeyX' || e.repeat || e.metaKey || e.ctrlKey || e.altKey || U.gone || !live()) return; const tag = e.target && e.target.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA') return; U.nextWeather(e.shiftKey ? -1 : 1); });
@@ -908,6 +909,9 @@ const UI = (() => {
       } else if (gy.on) { gy.on = false; el.steer.classList.remove('on'); }
     }
     { const k = Input.btn.jump ? sat(Game.s.charge || 0) : 0; if (k !== (U.shown.k || 0)) { U.shown.k = k; el.jump.style.setProperty('--k', k.toFixed(3)); } }
+    // (at a keyboard: the same ring, for the jump key. Shown from the first moment the legs fold, kept up a moment after the key is let go)
+    if (el.chg && Variants.val.kring === 'b') { const on = !!Input.jump && !Input.btn.jump && Game.s.charge > 0, k = on ? sat(Game.s.charge || 0) : (U.shown.kk || 0);
+      if (on !== !!U.shown.kon) { U.shown.kon = on; el.chg.classList.toggle('on', on); } if (k !== (U.shown.kk || 0)) { U.shown.kk = k; el.chg.style.setProperty('--k', k.toFixed(3)); } }
     swAcc += dt; if (U.open && swAcc > 0.25) { swAcc = 0; paint(); }
   }
   return U;

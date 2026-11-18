@@ -50,17 +50,26 @@ if (typeof Variants !== 'undefined') {
   // 40-45). a: as it was. b: real piste pitches (x0.75: a bowl about 15 degrees, a blue-red; the steeps about 24, a black). c: gentle
   // (x0.6: the steeps about 20 degrees). Every run's fall is scaled, nothing else: the deck, the features and their places stay the
   // same random draws, and speed falls by physics alone (no brakes anywhere). On top of 地形难度 (whose levels scale slope as well)
-  Variants.def('slope', '坡度', [['a', '原来'], ['b', '真实雪道'], ['c', '平缓']], 'a');
+  // The reference recordings average about 585 m of descent over 2.15 km.
+  // Use the real-piste preset as the measured slope anchor and extrapolate
+  // other slope presets from it.
+  Variants.def('slope', '坡度', [['a', '原来'], ['b', '真实雪道'], ['c', '平缓']], 'b');
   // (a change lays the same mountain out again)
   Variants.on((n, v, init) => { if (!init && (n === 'terr' || n === 'tdiff' || n === 'slope') && typeof App !== 'undefined' && App.ready && App.newMountain) App.newMountain(Course.seed); });
 }
-// slope scale and how much further a run of ~30 s then reaches (pace: the test pilot's distance over 30 s against a, 2026-11-14)
-const SLOPE_K = { a: { k: 1, pace: 1 }, b: { k: 0.75, pace: 0.89 }, c: { k: 0.6, pace: 0.69 } };
 const HREF_SLOPE = 0.36;        // reference plane removed from heights before they go into float textures
+// Joint anchor from the three Garmin recordings in Downloads/datasets. The
+// speed is paired with the measured descent slope and is extrapolated below.
+const REAL_SKI_ANCHOR = Object.freeze({
+  slopeTan: 582.4 / 2154.93,
+  speedMean: (6.5496624674 + 7.0107918054 + 6.5043248346) / 3,
+});
+// slope scale and how much further a run of ~30 s then reaches (pace: the test pilot's distance over 30 s against a, 2026-11-14)
+const SLOPE_K = { a: { k: 1, pace: 1 }, b: { k: REAL_SKI_ANCHOR.slopeTan / HREF_SLOPE, pace: 0.89 }, c: { k: 0.6, pace: 0.69 } };
 const TREE_CELL = 4.5;
 
 const Course = ((vn1, vn2, h2U) => {
-  const C = { seed: 261111, segs: [], feats: new Map(), mogK: 1, rockCap: 0, rich: false, lv: 'b', isl: 1 };
+  const C = { seed: 261111, segs: [], feats: new Map(), mogK: 1, rockCap: 0, rich: false, lv: 'b', isl: 1, skiCalibration: REAL_SKI_ANCHOR };
   // the shape of a mogul field (owner, 2026-11-14: are the bumps too tall and too close together? What do real ones look like?).
   // L: metres from one row of bumps to the next down the fall line; W: across; H: crest over trough of an average bump (big scales it
   // B0..B0+B1); Q: where in a row the crest stands (the rest is the short steep face below); R: how round the crown is; J: how far rows wander.

@@ -131,6 +131,9 @@ const Game = (() => {
   // costs (speed owed per m/s of speed into the snow, beyond what legs take in their stride), how fast a leg can follow snow that falls away
   // and how far the legs reach out for a landing; how fast the edges' grip follows the load, and how fast the skis are swung into a skid
   const GRAV = 9.81, K_LEG = 95, K3_LEG = 420, C_LEG = 16, C_REB = 40, E_MAX = 0.22, E_MIN = -0.30, N_MAX = 7 * GRAV, N_HARD = 14 * GRAV, N_SLEW = 2 * GRAV * 120, MOG_K = 0.45, MOG_MU = 0.12, LAND_K = 0.3, LAND_V0 = 3, LEG_V = 4, LEG_AIR = 0.18, BITE_K = 4, BETA_W = 15, H = 1 / 120;
+  // Static friction keeps a skier at rest on a level or very shallow slope.
+  // The dynamic friction below retains the measured snow-film dependence.
+  const V_STATIC = 0.18, MU_STATIC = 0.055, CAL_SPEED_GAIN = 0.10, CAL_SPEED_MAX = 0.45;
   // (feel b) the most the edges hold across the line, in parts of the load, on packed snow and in deep powder; the snow's friction there at speed;
   // the drag of powder ploughed, per metre of depth the skis ride at (m/s^2 per m)
   const GRIP_B = [1.0, 0.95], MU_B = [0.035, 0.04], PLOW_K = 3.5;
@@ -434,7 +437,7 @@ const Game = (() => {
       // well as the weight; and deep powder ploughed: a drag as deep as the skis ride in it (the same depth the tracks draw, 17_tracks.js,
       // planing up to under half of it from 6 to 18 m/s), deeper and slower as they settle in than as they plane out, and up to twice as
       // much with the skis thrown across it
-      const mog = c.mog > 0.01 ? MOG_MU * Course.bumps(p[0], p[2]) : 0, lowV = sat(sp / 0.6);       // (a field of bumps is slow going; the smooth line through it is not)
+      const mog = c.mog > 0.01 ? MOG_MU * Course.bumps(p[0], p[2]) : 0;       // (a field of bumps is slow going; the smooth line through it is not)
       const MB = Variants.val.mog !== 'a', aMog = MB ? mogA : 0;
       let mu = lerp(0.028, 0.06, S.powder) + (MB ? 0 : mog), plow = 0, Nf = N;
       if (FB) {
@@ -445,18 +448,31 @@ const Game = (() => {
         S.pdep = damp(S.pdep || 0, dT, dT > (S.pdep || 0) ? 5 : 1.7, dt);
         plow = PLOW_K * S.pdep * (1 + Math.abs(sb));
       }
-      aLat = aReac; const aDr = (aSk * Math.abs(sb) + (0.05 * Math.abs(aCb) + mu * Nf) * dragFA + plow + aMog) * lowV; aTan -= aDr; S.aDrag = aDr;
+      aLat = aReac;
+      const aDr = aSk * Math.abs(sb) + (0.05 * Math.abs(aCb) + mu * Nf) * dragFA + plow + aMog;
+      // At rest, static friction cancels the downhill component only while it
+      // remains below its limit. Once the limit is exceeded, dynamic friction
+      // opposes motion or the downhill direction when motion has not started.
+      const aSlope = -GRAV * ty, aDrive = aSlope + aPole, hold = sp < V_STATIC && Math.abs(aDrive) <= MU_STATIC * Math.max(Nf, GRAV * 0.5) && S.crash <= 0;
+      if (hold) { aTan -= aDrive; S.aDrag = 0; }
+      else { const dir = sp >= V_STATIC ? 1 : sign(aDrive || 1); aTan -= dir * aDr; S.aDrag = aDr; }
       S.aReac = aReac; S.aSkid = aSk; S.aCarve = aC;
-      if (S.crash > 0) { aTan -= 2.5 * lowV; }
+      if (S.crash > 0) { aTan -= (sp > V_STATIC ? 1 : sign(aDrive || 1)) * 2.5 * smooth(0, 0.6, sp); }
       // (it slows, never stops: down any slope worth the name the skier still gathers speed off the run, only less of it. Tried at 1 + 0.008 v^2
       // it held a skier 25 m out to 30-40 km/h on a 20-degree pitch, and the owner felt it as gravity gone wrong (2026-11-12))
       if (eo > 0) aTan -= (Course.rich ? 0.5 : 1) * (0.3 + 0.0022 * sp * sp) * sat(eo / 16) * (1 - 0.5 * Math.max(c.ridge, sat((c.rtail - 0.74) / 0.26))) * sat(sp / 6);       // deep, unpacked snow off the run (wind-packed and firmer about a ridge)
       if (S.owe > 0) { const d = Math.min(S.owe, 16 * dt, sp); aTan -= d / dt; S.owe -= d; }
+      // The recordings provide one joint slope/speed anchor, rather than a
+      // separate target for every slope. Apply only a small residual on a
+      // nearly straight glide; turns remain governed by the force model.
+      const cal = Course.skiCalibration, slopeTan = Math.hypot(n[0], n[2]) / Math.max(n[1], 0.2), vAnchor = cal ? cal.speedMean * Math.sqrt(clamp(slopeTan / cal.slopeTan, 0.25, 4)) : 0;
+      const straight = (1 - smooth(0.12, 0.45, Math.abs(S.lean))) * (1 - smooth(0.10, 0.35, Math.abs(S.beta)));
+      const aCal = sp > V_STATIC && vAnchor > 0 ? clamp((vAnchor - sp) * CAL_SPEED_GAIN, -CAL_SPEED_MAX, CAL_SPEED_MAX) * straight : 0;
+      aTan += aCal; S.aCal = aCal;
     }
     // the air drags on the whole of the speed, wherever it points (in flight too); a tuck halves it, and the player's own tuck counts for more than the one the body falls into at speed
     const sp3 = Math.hypot(v[0], v[1], v[2]), kd = lerp(0.0036, 0.0021, Math.max(0.55 * S.tuck, S.tuckIn)) * sp3;
     let ax = n[0] * N + rx * aLat + tx * aTan - kd * v[0], ay = -GRAV + n[1] * N + ry * aLat + ty * aTan - kd * v[1], az = n[2] * N + rz * aLat + tz * aTan - kd * v[2];
-    if (contact && sp < 2.5 && !(TB && Math.abs(u) > 0.3)) { const k = 1.6 * (1 - sp / 2.5); ax += fx * k; ay += fy * k; az += fz * k; }     // never stall: a gentle push down the fall line
     v[0] += ax * dt; v[1] += ay * dt; v[2] += az * dt;
     p[0] += v[0] * dt; p[1] += v[1] * dt; p[2] += v[2] * dt;
     // trees: brushing the branches slows a little and shakes snow loose, hitting a trunk throws the skier off line

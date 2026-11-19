@@ -37,6 +37,8 @@ def convert(source: Path, destination: Path, session: str | None = None) -> Path
     # The viewer requires strictly increasing timestamps. A paused display
     # frame can repeat game time, so discard repeated timestamps here.
     times = np.asarray([float(s["t"]) for s in samples], dtype=np.float64)
+    if not np.isfinite(times).all():
+        raise ValueError("sample timestamps t must be finite")
     keep = np.r_[True, np.diff(times) > 0.0]
     samples = [sample for sample, valid in zip(samples, keep) if valid]
     times = times[keep]
@@ -62,7 +64,14 @@ def convert(source: Path, destination: Path, session: str | None = None) -> Path
     if ground_z.shape != (len(samples),) or not np.isfinite(ground_z).all():
         raise ValueError("ground_z must be finite with shape (frames,)")
 
+    # Keep the recorded, potentially irregular cadence.  ``measured_hz`` is
+    # only a sampling hint from the browser and must not be used to construct
+    # the replay clock.  Round relative ``t`` to integer nanoseconds so the
+    # H5 reader can use an exact, monotonic integer time base.
     capture_time_ns = np.rint((times - times[0]) * 1e9).astype(np.int64)
+    if np.any(np.diff(capture_time_ns) <= 0):
+        raise ValueError("timestamps are not strictly increasing at nanosecond precision")
+    measured_hz = float((len(times) - 1) / (times[-1] - times[0]))
     if (gravity_body.shape != (len(samples), 3) or not np.isfinite(gravity_body).all()
             or not np.allclose(np.linalg.norm(gravity_body, axis=1), 1.0, atol=0.01, rtol=0.0)):
         raise ValueError("gravity_body must be finite with shape (frames, 3)")
@@ -79,7 +88,12 @@ def convert(source: Path, destination: Path, session: str | None = None) -> Path
         string_type = h5py.string_dtype(encoding="utf-8")
         output.attrs["keypoint_names"] = np.asarray(KEYPOINT_NAMES, dtype=string_type)
         output.attrs["hip_centre_index"] = 8
-        output.attrs["measured_hz"] = float(recording.get("measured_hz") or 0.0)
+        # Report the cadence actually present in t.  Keep the browser's
+        # requested rate separately for diagnostics when it was provided.
+        output.attrs["measured_hz"] = measured_hz
+        requested_hz = recording.get("requested_hz", recording.get("measured_hz"))
+        if requested_hz is not None:
+            output.attrs["requested_hz"] = float(requested_hz)
         output.attrs["frame_count"] = len(samples)
         output.attrs["keypoint_count"] = 15
         output.attrs["session_name"] = session or source.stem

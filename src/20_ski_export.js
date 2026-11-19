@@ -145,6 +145,10 @@ const SkiExport = (() => {
 
   function data() {
     if (!R) return null;
+    const firstT = R.samples.length ? Number(R.samples[0].t) : 0;
+    const lastT = R.samples.length ? Number(R.samples[R.samples.length - 1].t) : firstT;
+    const measuredHz = R.samples.length > 1 && lastT > firstT
+      ? (R.samples.length - 1) / (lastT - firstT) : null;
     return {
       format: 'cold-smoke-ski-v1',
       coordinate_system: 'FLU', position_unit: 'm',
@@ -155,7 +159,10 @@ const SkiExport = (() => {
         run_left: R.left ? round3(R.left) : null,
         run_up: R.up ? round3(R.up) : null,
       },
-      keypoint_names: KEYPOINT_NAMES.slice(), measured_hz: R.hz || null, samples: R.samples.slice(),
+      keypoint_names: KEYPOINT_NAMES.slice(),
+      measured_hz: measuredHz,
+      requested_hz: R.hz || null,
+      samples: R.samples.slice(),
     };
   }
 

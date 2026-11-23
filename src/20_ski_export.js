@@ -31,16 +31,11 @@ const SkiExport = (() => {
   }
 
   function initialiseAxes(hip) {
-    const root = Game.root, S = Game.s;
-    // H5's FLU convention uses gravity-up for U. The terrain normal is
-    // exported separately in ground.normal and must not replace world up.
-    let up = [0, 1, 0];
-    let forward = clone3(root.fwd) || clone3(S.t) || [0, 0, -1];
-    forward = sub3(forward, [up[0] * dot3(forward, up), up[1] * dot3(forward, up), up[2] * dot3(forward, up)]);
-    forward = norm3(forward);
-    let left = norm3(cross3(up, forward));
-    // Re-orthogonalise up so the run-local FLU basis is right handed.
-    up = norm3(cross3(forward, left));
+    // Course's fixed fall line is world -Z. Starting a recording while the
+    // skier traverses must not turn downhill travel into lateral FLU motion.
+    // Keep gravity-up, independently of both the skier and the local normal.
+    const forward = [0, 0, -1], up = [0, 1, 0];
+    const left = cross3(up, forward);
     R.origin = hip.slice(); R.forward = forward; R.left = left; R.up = up;
   }
 
@@ -153,7 +148,8 @@ const SkiExport = (() => {
       format: 'cold-smoke-ski-v1',
       coordinate_system: 'FLU', position_unit: 'm',
       axes: {
-        keypoints_world: 'run-local FLU metres: x forward, y left, z up',
+        keypoints_world: 'run-local FLU metres: x downhill, y left, z gravity-up',
+        reference: 'course_fall_line',
         run_origin: R.origin ? round3(R.origin) : null,
         run_forward: R.forward ? round3(R.forward) : null,
         run_left: R.left ? round3(R.left) : null,

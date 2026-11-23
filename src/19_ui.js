@@ -46,6 +46,7 @@ const UI = (() => {
       if (mine) { muteKey(e.code); return; }
       if (U.open && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); muteKey(e.code); el.mGo.click(); return; }          // (nothing in the menu has the focus: Enter, or space as the owner asked, is the top line, 继续滑 or 出发)
       if ((e.code === 'Enter' || e.code === 'Space') && U.state === 'title' && !U.open) { e.preventDefault(); muteKey(e.code); U.go(); }
+      else if (e.code === 'KeyO' && (U.state === 'title' || U.state === 'run')) { e.preventDefault(); muteKey(e.code); U.recordToggle(); }
       else if (e.code === 'KeyM') { U.sound(!Sound.on); if (U.open) paint(); }
       else if (e.code === 'KeyF') U.fullscreen();
       else if (U.state === 'title' || U.state === 'run') {
@@ -58,7 +59,10 @@ const UI = (() => {
     function muteKey(c) { try { if (typeof Input !== 'undefined' && Input.keys) { Input.mute = c; Input.keys[c] = false; } } catch (err) { } }
     el.snd.addEventListener('click', e => { e.stopPropagation(); U.sound(!Sound.on); if (e.detail) el.snd.blur(); });
     el.fs.addEventListener('click', e => { e.stopPropagation(); U.fullscreen(); });
-    if (el.rec) el.rec.addEventListener('click', e => { e.stopPropagation(); U.recordToggle(); if (e.detail) el.rec.blur(); });
+    if (el.rec) {
+      el.rec.setAttribute('aria-keyshortcuts', 'O');
+      el.rec.addEventListener('click', e => { e.stopPropagation(); U.recordToggle(); if (e.detail) el.rec.blur(); });
+    }
     /*web{*/ document.addEventListener('fullscreenchange', () => {
       const on = !!document.fullscreenElement, own = performance.now() - fsT < 1500; fsT = performance.now();
       el.fs.classList.toggle('full', on); el.fs.setAttribute('aria-pressed', on ? 'true' : 'false'); U.layout(); if (U.open) paint();
